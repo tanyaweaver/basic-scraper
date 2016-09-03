@@ -2,6 +2,7 @@ import requests
 import sys
 from bs4 import BeautifulSoup
 import re
+import geocoder
 
 DOMAIN_NAME = 'http://info.kingcounty.gov'
 PATH = '/health/ehs/foodsafety/inspections/Results.aspx'
@@ -168,20 +169,45 @@ def extract_score_data(element):
     return data
 
 
-if __name__ == "__main__":
+def generate_results(test=False):
+    """
+    Generate results using test settings or an API requst.
+    """
     kwargs = {
         'Inspection_Start': '1/1/2013',
         'Inspection_End': '1/10/2013',
         'City': 'Seattle',
         'Zip_code': '98108'
     }
-if len(sys.argv) > 1 and sys.argv[1] == 'test':
-    html, encoding = load_inspection_page('src/inspection_page.html')
-else:
-    html, encoding = get_inspection_page(**kwargs)
-doc = parse_source(html, encoding)
-listings = extract_data_listings(doc)
-for listing in listings:
-    metadata = extract_restaurant_metadata(listing)
-    score_data = extract_score_data(listing)
-    print(metadata, '\n', score_data, '\n')
+    if test:
+        html, encoding = load_inspection_page('src/inspection_page.html')
+    else:
+        html, encoding = get_inspection_page(**kwargs)
+    doc = parse_source(html, encoding)
+    listings = extract_data_listings(doc)
+    for listing in listings:
+        metadata = extract_restaurant_metadata(listing)
+        score_data = extract_score_data(listing)
+        metadata.update(score_data)
+        yield metadata
+
+
+def get_geojson(result):
+    """
+    Take the search result as an input. Get geocoding data from
+    google using the address of the restaurant. Return the geojson
+    representation of that data.
+    """
+    address = ' '.join(result.get('Address', ' '))
+    if not address:
+        return None
+    geocoded = geocoder.google(address)
+    return geocoded.geojson
+
+
+if __name__ == "__main__":
+    import pprint
+    test = len(sys.argv) > 1 and sys.argv[1] == 'test'
+    for result in generate_results(test):
+        geo_result = get_geojson(result)
+        pprint.pprint(geo_result)
