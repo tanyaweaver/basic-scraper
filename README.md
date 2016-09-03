@@ -18,6 +18,7 @@ $python scraper.py test
 ### To use an API call:
 ```
 $python scraper.py
+```
 
 ### The parameters for the search are at the bottom of scraper.py and can be adjusted:
 ```
